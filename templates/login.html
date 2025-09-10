@@ -2,10 +2,10 @@
 {% block body %}
   <h2>Login</h2>
   <form method="post" action="/login">
-    <input name="email" placeholder="email" />
-    <input name="password" placeholder="password" type="password" />
+    <input name="email" type="email" placeholder="email" autocomplete="username" required />
+    <input name="password" type="password" placeholder="password" autocomplete="current-password" required />
     <input type="hidden" name="device_data" id="device_data" />
-    <input name="totp" placeholder="TOTP (if enabled)" />
+    <input name="totp" inputmode="numeric" pattern="\\d{6}" placeholder="TOTP (if enabled)" autocomplete="one-time-code" />
     <button>Login</button>
   </form>
   <a href="/register">Register</a>

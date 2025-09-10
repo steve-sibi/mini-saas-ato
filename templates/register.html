@@ -2,8 +2,8 @@
 {% block body %}
   <h2>Register</h2>
   <form method="post">
-    <input name="email" placeholder="email" />
-    <input name="password" placeholder="password" type="password" />
+    <input name="email" type="email" placeholder="email" autocomplete="username" required />
+    <input name="password" type="password" placeholder="password" autocomplete="new-password" required />
     <button>Create</button>
   </form>
 {% endblock %}

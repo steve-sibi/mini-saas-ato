@@ -7,19 +7,27 @@
   <!-- Datadog RUM -->
   <script src="https://www.datadoghq-browser-agent.com/datadog-rum-v5.js" crossorigin="anonymous"></script>
   <script>
-    window.DD_RUM && window.DD_RUM.init({
-      applicationId: "{{ env.RUM_APP_ID if env and env.RUM_APP_ID else '' }}",
-      clientToken: "{{ env.RUM_CLIENT_TOKEN if env and env.RUM_CLIENT_TOKEN else '' }}",
-      site: "{{ env.DD_SITE if env and env.DD_SITE else 'datadoghq.com' }}",
-      service: "mini-ato-saas",
-      env: "prod",
-      sampleRate: 100,
-      trackUserInteractions: true,
-      trackResources: true,
-      trackLongTasks: true
-    });
-  </script>
-  <script src="/static/device.js"></script>
+  (function () {
+    var appId = "{{ env.RUM_APP_ID if env and env.RUM_APP_ID else '' }}";
+    var token = "{{ env.RUM_CLIENT_TOKEN if env and env.RUM_CLIENT_TOKEN else '' }}";
+    var site  = "{{ env.DD_SITE if env and env.DD_SITE else 'datadoghq.com' }}";
+    if (window.DD_RUM && appId && token) {
+      DD_RUM.init({
+        applicationId: appId,
+        clientToken: token,
+        site: site,
+        service: "mini-ato-saas",
+        env: "prod",
+        sampleRate: 100,
+        trackUserInteractions: true,
+        trackResources: true,
+        trackLongTasks: true
+      });
+    }
+  })();
+</script>
+<script src="{{ url_for('static', filename='device.js') }}"></script>
+
 </head>
 <body>
   {% block body %}{% endblock %}
