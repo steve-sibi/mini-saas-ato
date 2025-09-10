@@ -48,12 +48,6 @@ handler.setFormatter(JsonFormatter())
 logger.setLevel(logging.INFO)
 logger.addHandler(handler)
 
-
-@bp.before_app_first_request
-def init_db():
-    Base.metadata.create_all(bind=engine)
-
-
 @bp.get("/register")
 def register_form():
     return render_template("register.html")

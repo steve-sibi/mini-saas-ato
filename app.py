@@ -5,6 +5,7 @@ from flask_session import Session
 from redis import Redis
 
 from auth import bp as auth_bp
+from db import Base, engine
 
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", os.urandom(16))
@@ -39,6 +40,14 @@ def health():
     return "ok", 200
 
 
+# Create tables once at startup (idempotent)
+try:
+    Base.metadata.create_all(bind=engine)
+    app.logger.info("db_init_success")
+except Exception:
+    app.logger.exception("db_init_failed")
+
+
 @app.context_processor
 def inject_env():
     import os
@@ -47,7 +56,7 @@ def inject_env():
         env={
             "RUM_APP_ID": os.getenv("RUM_APP_ID", ""),
             "RUM_CLIENT_TOKEN": os.getenv("RUM_CLIENT_TOKEN", ""),
-            "DD_SITE": os.getenv("DD_SITE", "datadoghq.com"),
+            "DD_SITE": os.getenv("DD_SITE", "us5.datadoghq.com"),
         }
     )
 
