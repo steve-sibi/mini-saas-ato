@@ -1,0 +1,10 @@
+Flask==3.0.3
+gunicorn==22.0.0
+flask-session==0.8.0
+redis==5.0.7
+psycopg2-binary==2.9.9
+SQLAlchemy==2.0.34
+passlib[bcrypt]==1.7.4
+pyotp==2.9.0
+user-agents==2.2.0
+itsdangerous==2.2.0

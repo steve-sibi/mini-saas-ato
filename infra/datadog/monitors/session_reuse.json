@@ -1,0 +1,18 @@
+{
+  "name": "ATO: Session Reuse (sid\u2192multi device)",
+  "type": "log alert",
+  "query": "logs('evt:login AND outcome:success').rollup('cardinality','@device_hash').by('@usr','@sid').over('last_5m') > 1",
+  "message": "@webhook-ato-contain Session reused across devices",
+  "tags": [
+    "service:mini-ato-saas",
+    "env:prod",
+    "usecase:ato"
+  ],
+  "options": {
+    "evaluation_delay": 60,
+    "include_tags": true,
+    "thresholds": {
+      "critical": 1
+    }
+  }
+}
