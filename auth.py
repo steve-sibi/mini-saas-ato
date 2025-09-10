@@ -6,7 +6,6 @@ import os
 import time
 
 import pyotp
-from db import SessionLocal, engine
 from flask import (
     Blueprint,
     make_response,
@@ -16,11 +15,12 @@ from flask import (
     session,
     url_for,
 )
-from models import Base, User
 from passlib.hash import bcrypt
 from sqlalchemy import select
 
-from .device import device_hash
+from db import SessionLocal, engine
+from device import device_hash
+from models import Base, User
 
 bp = Blueprint("auth", __name__)
 logger = logging.getLogger("auth")
