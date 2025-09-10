@@ -1,7 +1,9 @@
 import os
+
 from flask import Flask, render_template, session
 from flask_session import Session
 from redis import Redis
+
 from auth import bp as auth_bp
 
 app = Flask(__name__)
@@ -19,15 +21,36 @@ Session(app)
 
 app.register_blueprint(auth_bp)
 
+
 @app.get("/")
 def home():
     if "user" in session:
-        return render_template("dashboard.html", user=session["user"]) 
+        return render_template("dashboard.html", user=session["user"])
     return render_template("login.html")
+
 
 @app.get("/dashboard")
 def dashboard():
     return render_template("dashboard.html", user=session.get("user"))
+
+
+@app.get("/__health")
+def health():
+    return "ok", 200
+
+
+@app.context_processor
+def inject_env():
+    import os
+
+    return dict(
+        env={
+            "RUM_APP_ID": os.getenv("RUM_APP_ID", ""),
+            "RUM_CLIENT_TOKEN": os.getenv("RUM_CLIENT_TOKEN", ""),
+            "DD_SITE": os.getenv("DD_SITE", "datadoghq.com"),
+        }
+    )
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)
