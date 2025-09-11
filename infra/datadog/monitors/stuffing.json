@@ -1,7 +1,7 @@
 {
   "name": "ATO: Credential Stuffing (IP\u2192Many Users)",
   "type": "log alert",
-  "query": "logs('evt:login AND outcome:fail').index('main').rollup('count').by('@ip').over('last_5m') > 50",
+  "query": "logs('evt:login AND outcome:fail').index('main').rollup('count').by('@ip').over('last_5m') > 10",
   "message": "@webhook-ato-contain High volume auth fails from same IP",
   "tags": [
     "service:mini-ato-saas",
