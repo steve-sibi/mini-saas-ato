@@ -11,12 +11,18 @@ app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", os.urandom(16))
 
 # Server-side sessions in Redis
+# Prefer TLS URL if present, then fall back to non-TLS or local
 redis_url = (
     os.getenv("REDIS_TLS_URL") or os.getenv("REDIS_URL") or "redis://localhost:6379/0"
 )
+
+# For some Heroku Redis TLS endpoints, disable cert verification (lab/demo only)
+if redis_url.startswith("rediss://") and "ssl_cert_reqs=" not in redis_url:
+    redis_url += ("&" if "?" in redis_url else "?") + "ssl_cert_reqs=none"
+
 app.config.update(
     SESSION_TYPE="redis",
-    SESSION_REDIS=Redis.from_url(redis_url),
+    SESSION_REDIS=Redis.from_url(redis_url),  # no 'ssl=' kwarg; rediss:// handles TLS
     SESSION_COOKIE_SECURE=True,
     SESSION_COOKIE_SAMESITE="Lax",
 )
