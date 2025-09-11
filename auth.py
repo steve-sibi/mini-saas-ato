@@ -3,6 +3,7 @@ import hmac
 import json
 import logging
 import os
+import secrets
 import time
 
 import pyotp
@@ -47,6 +48,7 @@ handler = logging.StreamHandler()
 handler.setFormatter(JsonFormatter())
 logger.setLevel(logging.INFO)
 logger.addHandler(handler)
+
 
 @bp.get("/register")
 def register_form():
@@ -100,6 +102,10 @@ def login_post():
         session["user"] = email
         session["device_hash"] = dhash
         session["login_time"] = int(time.time())
+
+        sid = session.get("sid") or secrets.token_hex(16)
+        session["sid"] = sid
+
         logger.info(
             "auth_success",
             extra={
@@ -107,6 +113,7 @@ def login_post():
                 "outcome": "success",
                 "email": email,
                 "device_hash": dhash,
+                "sid": sid,
             },
         )
         return redirect(url_for("dashboard"))
