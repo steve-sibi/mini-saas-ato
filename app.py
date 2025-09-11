@@ -11,10 +11,12 @@ app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET", os.urandom(16))
 
 # Server-side sessions in Redis
-redis_url = os.getenv("REDIS_URL") or os.getenv("REDIS_TLS_URL")
+redis_url = (
+    os.getenv("REDIS_TLS_URL") or os.getenv("REDIS_URL") or "redis://localhost:6379/0"
+)
 app.config.update(
     SESSION_TYPE="redis",
-    SESSION_REDIS=Redis.from_url(redis_url, ssl=redis_url.startswith("rediss://")),
+    SESSION_REDIS=Redis.from_url(redis_url),
     SESSION_COOKIE_SECURE=True,
     SESSION_COOKIE_SAMESITE="Lax",
 )
