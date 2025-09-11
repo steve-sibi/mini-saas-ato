@@ -8,3 +8,5 @@ passlib[bcrypt]==1.7.4
 pyotp==2.9.0
 user-agents==2.2.0
 itsdangerous==2.2.0
+bcrypt==3.2.2
+
