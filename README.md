@@ -86,3 +86,56 @@ python app.py
 ```
 
 The app auto-creates tables via SQLAlchemy on first hit (or at startup depending on your version). If you use Postgres locally, set `DATABASE_URL=postgresql+psycopg2://...`.
+
+# Deploy to Heroku (via GitHub, not Heroku Git)
+
+1. **Create app** and connect your GitHub repo in the Heroku dashboard (Deploy tab).
+    
+2. **Add-ons**
+
+```
+heroku addons:create heroku-postgresql:essential-0 -a <APP>
+heroku addons:create heroku-redis:mini -a <APP>    # or hobby/basic if needed
+```
+
+3. **Buildpacks (order matters)**
+
+```
+heroku buildpacks:clear -a <APP>
+heroku buildpacks:add heroku/python -a <APP>
+heroku buildpacks:add https://github.com/DataDog/heroku-buildpack-datadog -a <APP>
+```
+
+4. **Config vars**  
+    Generate secrets locally, then set (adjust `DD_SITE` if not us5):
+
+```
+heroku config:set -a <APP> \
+  FLASK_SECRET=$(python -c 'import secrets; print(secrets.token_hex(16))') \
+  ATO_HMAC_SECRET=$(python -c 'import secrets; print(secrets.token_hex(32))') \
+  DD_API_KEY=<YOUR_DD_API_KEY> \
+  DD_SITE=us5.datadoghq.com \
+  DD_SERVICE=mini-ato-saas \
+  DD_ENV=prod
+```
+After scouring through documentation, I found out that Postgres/Redis URLs are injected automatically (`DATABASE_URL`, `REDIS_TLS_URL`/`REDIS_URL`).
+
+5. **Datadog logs (Logplex drain)**  
+Agent buildpack doesn’t collect router/app logs; add the HTTPS drain:
+
+```
+SERVICE=mini-ato-saas
+heroku drains:add \
+"https://http-intake.logs.us5.datadoghq.com/api/v2/logs?dd-api-key=$DD_API_KEY&ddsource=heroku&service=$SERVICE&ddtags=env:prod,service:$SERVICE,usecase:ato" \
+ -a <APP>
+```
+
+6. **Deploy**  
+From the Heroku dashboard -> Deploy tab -> **Deploy Branch**.
+
+7. **Scale & Health**
+
+```
+heroku ps:scale web=1 -a <APP>
+open https://<APP>.herokuapp.com/__health     # -> ok
+```
