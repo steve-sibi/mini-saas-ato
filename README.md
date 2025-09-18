@@ -65,7 +65,7 @@ Browser ──(login + RUM)──> Flask (Heroku)
 
 # Quickstart (Local)
 
-```
+```bash
 # 1) Create a virtualenv
 python3 -m venv .venv && source .venv/bin/activate
 
@@ -93,7 +93,7 @@ The app auto-creates tables via SQLAlchemy on first hit (or at startup depending
     
 2. **Add-ons**
 
-```
+```bash
 heroku addons:create heroku-postgresql:essential-0 -a <APP>
 heroku addons:create heroku-redis:mini -a <APP>    # or hobby/basic if needed
 ```
@@ -109,7 +109,7 @@ heroku buildpacks:add https://github.com/DataDog/heroku-buildpack-datadog -a <AP
 4. **Config vars**  
     Generate secrets locally, then set (adjust `DD_SITE` if not us5):
 
-```
+```bash
 heroku config:set -a <APP> \
   FLASK_SECRET=$(python -c 'import secrets; print(secrets.token_hex(16))') \
   ATO_HMAC_SECRET=$(python -c 'import secrets; print(secrets.token_hex(32))') \
@@ -123,7 +123,7 @@ After scouring through documentation, I found out that Postgres/Redis URLs are i
 5. **Datadog logs (Logplex drain)**  
 Agent buildpack doesn’t collect router/app logs; add the HTTPS drain:
 
-```
+```bash
 SERVICE=mini-ato-saas
 heroku drains:add \
 "https://http-intake.logs.us5.datadoghq.com/api/v2/logs?dd-api-key=$DD_API_KEY&ddsource=heroku&service=$SERVICE&ddtags=env:prod,service:$SERVICE,usecase:ato" \
@@ -135,7 +135,7 @@ From the Heroku dashboard -> Deploy tab -> **Deploy Branch**.
 
 7. **Scale & Health**
 
-```
+```bash
 heroku ps:scale web=1 -a <APP>
 open https://<APP>.herokuapp.com/__health     # -> ok
 ```
@@ -150,7 +150,7 @@ open https://<APP>.herokuapp.com/__health     # -> ok
     
 - Set on Heroku:
 
-```
+```bash
 heroku config:set -a <APP> RUM_APP_ID=<appId> RUM_CLIENT_TOKEN=<clientToken>
 ```
 
@@ -177,7 +177,7 @@ Import JSON from `datadog/monitors/`:
 - **Credential Stuffing** (`stuffing.json`)  
     Query (demo threshold):
 
-```
+```sql
 logs('service:mini-ato-saas @syslog.appname:app evt:login AND outcome:fail')
   .index('main').rollup('count').by('@ip').over('last_5m') > 10
 ```
@@ -185,7 +185,7 @@ Set **critical=10** for demos (tune up later).
 
 - **Session Reuse** (`session_reuse.json`)
 
-```
+```sql
 logs('service:mini-ato-saas @syslog.appname:app evt:login AND outcome:success')   
     .rollup('cardinality','@device_hash').by('@usr','@sid').over('last_5m') > 1
 ```
@@ -208,13 +208,13 @@ This was more for my curiosity to understand the use of cloud services (such as 
         
 2) **Datadog Webhook**
     
-    - **Integrations → Webhooks**: name `ato-contain`, URL = your Function endpoint.
+    - **Integrations -> Webhooks**: name `ato-contain`, URL = your Function endpoint.
         
     - Set monitor message to include `@webhook-ato-contain`.
         
-    - Example payload (Datadog → Function):
+    - Example payload (Datadog -> Function):
 
-    ```
+    ```json
     {
         "sid": "${sid}",
         "usr": "${usr.name}",
@@ -226,3 +226,15 @@ This was more for my curiosity to understand the use of cloud services (such as 
 
 3) **Flask endpoint**  
 `/contain/revoke` verifies HMAC, clears the session, logs `evt:contain action:revoke`.
+
+# Attack Simulations (purple team)
+Ran these attacks locally to the cloud instance on Heroku to generate signals:
+
+```bash
+# 1) Credential stuffing (30 bad logins) -> should exceed >10 in 5m
+python scripts/attack/spray.py
+
+# 2) Session reuse (cookie replay from another device) -> multiple device_hash per sid
+python scripts/attack/session_reuse.py
+```
+Then check **Monitors** and **Logs -> Explorer** (group by `@ip`, `@sid`, `@device_hash`) and RUM sessions.
