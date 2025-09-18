@@ -8,7 +8,7 @@ A compact, production-style lab that demonstrates **account takeover (ATO) detec
     
 - **Detections-as-code**: Datadog log rules for **credential stuffing** and **session reuse** (cookie hijack), plus attack scripts to validate.
     
-- **Auto-containment**: Datadog → Webhook → Azure Function (HMAC) → `/contain/revoke` to invalidate risky sessions.
+- **Auto-containment**: Datadog -> Webhook -> Azure Function (HMAC) -> `/contain/revoke` to invalidate risky sessions.
     
 - **Docs/Runbooks**: Playbooks and monitor JSON you can import directly.
 
@@ -45,7 +45,7 @@ Browser ──(login + RUM)──> Flask (Heroku)
 ├─ models.py             # User model
 ├─ device.py             # device_hash() using CH/UA/IP + extra client hints
 ├─ templates/            # base.html, login.html, register.html, dashboard.html
-├─ static/device.js      # lightweight client hints → hidden field
+├─ static/device.js      # lightweight client hints -> hidden field
 ├─ scripts/attack/       # spray.py, session_reuse.py (simulations)
 ├─ datadog/monitors/     # stuffing.json, session_reuse.json (import into DD)
 ├─ runbooks/             # ATO-001/2/3.md (investigation & response steps)
@@ -139,3 +139,90 @@ From the Heroku dashboard -> Deploy tab -> **Deploy Branch**.
 heroku ps:scale web=1 -a <APP>
 open https://<APP>.herokuapp.com/__health     # -> ok
 ```
+
+# Datadog setup
+
+### 1) RUM (Browser monitoring)
+
+- In Datadog **Digital Experience -> RUM -> Applications**, create a Browser app (site **us5**).
+    
+- Copy **applicationId** and **clientToken**.
+    
+- Set on Heroku:
+
+```
+heroku config:set -a <APP> RUM_APP_ID=<appId> RUM_CLIENT_TOKEN=<clientToken>
+```
+
+- `templates/base.html` already loads the us5 CDN async snippet (copied from Datadog RUM) and initializes RUM using those env vars.
+
+### 2) Parse app logs (JSON -> attributes)
+
+- Go to **Logs -> Configuration -> Pipelines -> New**
+    
+    - Filter: `service:mini-ato-saas @syslog.appname:app`
+        
+    - Processor: **Parse -> JSON** (source **message**, merge into root)
+        
+    - (Optional) **Status remapper** from `level`.
+        
+- In **Logs -> Explorer**, filter `service:mini-ato-saas @syslog.appname:app` and confirm you see fields like `evt`, `outcome`, `email`, `ip`, `sid`, `device_hash`.
+    
+- (Optional) Promote facets for `evt`, `outcome`, `ip`, `sid`, `device_hash` (hover field -> gear -> **Create facet**).
+
+### 3) Import detections (monitors)
+
+Import JSON from `datadog/monitors/`:
+
+- **Credential Stuffing** (`stuffing.json`)  
+    Query (demo threshold):
+
+```
+logs('service:mini-ato-saas @syslog.appname:app evt:login AND outcome:fail')
+  .index('main').rollup('count').by('@ip').over('last_5m') > 10
+```
+Set **critical=10** for demos (tune up later).
+
+- **Session Reuse** (`session_reuse.json`)
+
+```
+logs('service:mini-ato-saas @syslog.appname:app evt:login AND outcome:success')   
+    .rollup('cardinality','@device_hash').by('@usr','@sid').over('last_5m') > 1
+```
+> **Note:** The app logs include a stable `sid` on successful login. If you don’t see it, ensure `auth.py` sets `session["sid"] = secrets.token_hex(16)` and logs it.
+
+### 4) (Optional) Cloud SIEM
+
+Instead of Monitors, you can create **Security -> Cloud SIEM -> Detection Rules (Log)** with the same queries + MITRE metadata to emit **Security Signals**.
+
+# Auto-containment (optional step but recommended)
+This was more for my curiosity to understand the use of cloud services (such as Azure) to contain threats with the use of Webhooks.
+
+1) **Azure Function** (HTTP trigger)
+    
+    - Reads JSON `{ "sid": "...", "usr": "...", "reason": "...", ... }`
+        
+    - Computes HMAC with `ATO_HMAC_SECRET`
+        
+    - POST to `https://<APP>.herokuapp.com/contain/revoke` with header `X-ATO-Signature: <hex>`
+        
+2) **Datadog Webhook**
+    
+    - **Integrations → Webhooks**: name `ato-contain`, URL = your Function endpoint.
+        
+    - Set monitor message to include `@webhook-ato-contain`.
+        
+    - Example payload (Datadog → Function):
+
+    ```
+    {
+        "sid": "${sid}",
+        "usr": "${usr.name}",
+        "ip": "${network.client.ip}",
+        "reason": "${alert_title}",
+        "monitor": "${monitor.name}"
+    }
+    ```
+
+3) **Flask endpoint**  
+`/contain/revoke` verifies HMAC, clears the session, logs `evt:contain action:revoke`.
