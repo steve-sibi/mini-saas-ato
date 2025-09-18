@@ -252,3 +252,11 @@ Then check **Monitors** and **Logs -> Explorer** (group by `@ip`, `@sid`, `@devi
 - **RUM site**: set `DD_SITE=us5.datadoghq.com` to match your Datadog region. (us5 was the case for me, but it can be different for you, so always check this in your browser)
     
 - **Facets (Datadog)**: creation isn’t retroactive, generate a few new events after adding these.
+
+## MITRE & detection mapping (cheat sheet as I add more attacks down the line)
+
+|Use case|Signal/Rule|ATT&CK|
+|---|---|---|
+|Credential stuffing|Many `evt:login outcome:fail` by same `@ip`|T1110.003 (Password Spraying)|
+|Session hijack/reuse|Same `@sid` with multiple `@device_hash`|T1550.004 (Web Session Cookie)|
+|MFA abuse (Work-In-Progress)|Excessive prompts / invalid TOTP attempts|T1621 (Multi-Factor Auth Interception/Abuse)|
