@@ -191,7 +191,7 @@ logs('service:mini-ato-saas @syslog.appname:app evt:login AND outcome:success')
 ```
 > **Note:** The app logs include a stable `sid` on successful login. If you don’t see it, ensure `auth.py` sets `session["sid"] = secrets.token_hex(16)` and logs it.
 
-### 4) (Optional) Cloud SIEM
+### 4) Cloud SIEM (Optional approach I came across when learning Datadog)
 
 Instead of Monitors, you can create **Security -> Cloud SIEM -> Detection Rules (Log)** with the same queries + MITRE metadata to emit **Security Signals**.
 
