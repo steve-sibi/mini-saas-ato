@@ -13,7 +13,7 @@ A compact, production-style lab that demonstrates **account takeover (ATO) detec
 - **Docs/Runbooks**: Playbooks and monitor JSON you can import directly.
 
 
-# Architecture
+## Architecture
 
 ```
 Browser ──(login + RUM)──> Flask (Heroku)
@@ -35,7 +35,7 @@ Browser ──(login + RUM)──> Flask (Heroku)
     
 - RUM events in **Digital Experience** for UI/behavioral context.
 
-# Repo Layout
+## Repo Layout
 
 ```
 .
@@ -55,7 +55,7 @@ Browser ──(login + RUM)──> Flask (Heroku)
 └─ runtime.txt           # python runtime for Heroku
 ```
 
-# Prerequisites
+## Prerequisites
 
 - Python 3.11+ (local), or just deploy to Heroku.
     
@@ -63,7 +63,7 @@ Browser ──(login + RUM)──> Flask (Heroku)
     
 - (Optional) Azure Functions (HTTP trigger) if you want auto-containment.
 
-# Quickstart (Local)
+## Quickstart (Local)
 
 ```bash
 # 1) Create a virtualenv
@@ -87,7 +87,7 @@ python app.py
 
 The app auto-creates tables via SQLAlchemy on first hit (or at startup depending on your version). If you use Postgres locally, set `DATABASE_URL=postgresql+psycopg2://...`.
 
-# Deploy to Heroku (via GitHub, not Heroku Git)
+## Deploy to Heroku (via GitHub, not Heroku Git)
 
 1. **Create app** and connect your GitHub repo in the Heroku dashboard (Deploy tab).
     
@@ -140,7 +140,7 @@ heroku ps:scale web=1 -a <APP>
 open https://<APP>.herokuapp.com/__health     # -> ok
 ```
 
-# Datadog setup
+## Datadog setup
 
 ### 1) RUM (Browser monitoring)
 
@@ -195,7 +195,7 @@ logs('service:mini-ato-saas @syslog.appname:app evt:login AND outcome:success')
 
 Instead of Monitors, you can create **Security -> Cloud SIEM -> Detection Rules (Log)** with the same queries + MITRE metadata to emit **Security Signals**.
 
-# Auto-containment (optional step but recommended)
+## Auto-containment (optional step but recommended)
 This was more for my curiosity to understand the use of cloud services (such as Azure) to contain threats with the use of Webhooks.
 
 1) **Azure Function** (HTTP trigger)
@@ -227,7 +227,7 @@ This was more for my curiosity to understand the use of cloud services (such as 
 3) **Flask endpoint**  
 `/contain/revoke` verifies HMAC, clears the session, logs `evt:contain action:revoke`.
 
-# Attack Simulations (purple team)
+## Attack Simulations (purple team)
 Ran these attacks locally to the cloud instance on Heroku to generate signals:
 
 ```bash
@@ -238,3 +238,17 @@ python scripts/attack/spray.py
 python scripts/attack/session_reuse.py
 ```
 Then check **Monitors** and **Logs -> Explorer** (group by `@ip`, `@sid`, `@device_hash`) and RUM sessions.
+
+## Security notes & gotchas
+
+- **Redis TLS**: Some Heroku Redis endpoints present a self-signed CA. The app appends `ssl_cert_reqs=none` to `rediss://` for my lab. For production, I'd suggest a proper CA bundle in an `ssl.SSLContext`.
+    
+- **bcrypt**: `passlib[bcrypt]==1.7.4` requires **bcrypt < 4**. `requirements.txt` pins `bcrypt==3.2.2`. (planning to update this in the future)
+    
+- **Heroku Postgres plan**: use `heroku-postgresql:essential-0` (the old `mini` plan is EOL - incase you haven't used Heroku in a while).
+    
+- **Procfile**: `web: gunicorn app:app` (ensure `gunicorn` is in `requirements.txt`).
+    
+- **RUM site**: set `DD_SITE=us5.datadoghq.com` to match your Datadog region. (us5 was the case for me, but it can be different for you, so always check this in your browser)
+    
+- **Facets (Datadog)**: creation isn’t retroactive, generate a few new events after adding these.
