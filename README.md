@@ -62,3 +62,27 @@ Browser ──(login + RUM)──> Flask (Heroku)
 - Datadog account (**us5**) with **DD API key**.
     
 - (Optional) Azure Functions (HTTP trigger) if you want auto-containment.
+
+# Quickstart (Local)
+
+```
+# 1) Create a virtualenv
+python3 -m venv .venv && source .venv/bin/activate
+
+# 2) Install deps
+pip install -r requirements.txt
+
+# 3) Env vars (example)
+export FLASK_SECRET=$(python -c 'import secrets; print(secrets.token_hex(16))')
+export ATO_HMAC_SECRET=$(python -c 'import secrets; print(secrets.token_hex(32))')
+# For local dev you can use sqlite + local redis:
+export DATABASE_URL="sqlite:///dev.db"
+export REDIS_URL="redis://localhost:6379/0"
+
+# 4) Run
+python app.py
+
+# open http://localhost:8000
+```
+
+The app auto-creates tables via SQLAlchemy on first hit (or at startup depending on your version). If you use Postgres locally, set `DATABASE_URL=postgresql+psycopg2://...`.
