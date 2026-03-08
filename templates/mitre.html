@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}MITRE Mapping{% endblock %}
+{% block body %}
+<section class="panel">
+  <p class="eyebrow">ATT&CK Mapping</p>
+  <h1>Detection coverage</h1>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Detection</th>
+        <th>ATT&CK</th>
+        <th>Rationale</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for code, attack_id, rationale in mappings %}
+      <tr>
+        <td>{{ code }}</td>
+        <td>{{ attack_id }}</td>
+        <td>{{ rationale }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

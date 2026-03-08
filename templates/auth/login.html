@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Login{% endblock %}
+{% block body %}
+<section class="auth-layout">
+  <div class="panel auth-panel">
+    <p class="eyebrow">Authentication</p>
+    <h1>Sign in to ATO Sentinel</h1>
+    {% if notice %}
+    <p class="flash flash-ok">{{ notice }}</p>
+    {% endif %}
+    {% if error %}
+    <p class="flash flash-error">{{ error }}</p>
+    {% endif %}
+    <form method="post" class="stack">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>
+        <span>Email</span>
+        <input name="email" type="email" value="{{ email or '' }}" autocomplete="username" required>
+      </label>
+      <label>
+        <span>Password</span>
+        <input name="password" type="password" autocomplete="current-password" required>
+      </label>
+      {% if challenge_required %}
+      <div class="challenge-box">
+        <p class="challenge-title">Challenge mode enabled</p>
+        <p>Reasons: {{ challenge_reasons|join(", ") }}</p>
+        {% if turnstile_enabled %}
+        <div class="cf-turnstile" data-sitekey="{{ settings.turnstile_site_key }}"></div>
+        {% else %}
+        <input type="hidden" name="cf-turnstile-response" value="dev-bypass">
+        <p class="hint">Turnstile keys are not configured. Local development uses the `dev-bypass` token.</p>
+        {% endif %}
+      </div>
+      {% endif %}
+      <button class="button button-primary" type="submit">Sign in</button>
+    </form>
+    <p class="hint">Need an account? <a href="/auth/register">Register a demo user</a>.</p>
+  </div>
+</section>
+{% if challenge_required and turnstile_enabled %}
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+{% endif %}
+{% endblock %}

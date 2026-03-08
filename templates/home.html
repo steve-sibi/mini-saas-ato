@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}ATO Sentinel{% endblock %}
+{% block body %}
+<section class="hero">
+  <div class="hero-copy">
+    <p class="eyebrow">Reference Architecture</p>
+    <h1>Build, detect, and contain account takeover activity from one app.</h1>
+    <p class="lede">
+      ATO Sentinel is a FastAPI security project that turns authentication telemetry into
+      MITRE-mapped detections, analyst-ready evidence, and automated containment actions.
+    </p>
+    <div class="actions">
+      <a class="button button-primary" href="/auth/register">Create Demo Account</a>
+      <a class="button button-secondary" href="/mitre">View MITRE Mapping</a>
+    </div>
+  </div>
+  <aside class="hero-panel">
+    <h2>Shipped detections</h2>
+    <ul class="feature-list">
+      <li><strong>ATO-001</strong> Password spray: one IP, many accounts.</li>
+      <li><strong>ATO-002</strong> Session cookie reuse across devices.</li>
+      <li><strong>ATO-003</strong> Impossible travel for valid accounts.</li>
+      <li><strong>ATO-004</strong> Distributed credential stuffing.</li>
+    </ul>
+  </aside>
+</section>
+{% endblock %}

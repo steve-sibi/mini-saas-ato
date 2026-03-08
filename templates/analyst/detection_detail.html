@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Detection Detail{% endblock %}
+{% block body %}
+<section class="dashboard-grid">
+  <div class="panel span-two">
+    <p class="eyebrow">Detection Detail</p>
+    <h1>{{ detection.detection_type }} · {{ detection.title }}</h1>
+    <div class="stat-grid">
+      <div class="stat"><span>ATT&CK</span><strong>{{ detection.mitre_attack_id }}</strong></div>
+      <div class="stat"><span>Subject</span><strong>{{ detection.subject_type }}: {{ detection.subject_value }}</strong></div>
+      <div class="stat"><span>Containment</span><strong>{{ detection.containment_state }}</strong></div>
+    </div>
+    <p>{{ detection.description }}</p>
+    <p class="hint">Runbook: <code>{{ detection.runbook_path }}</code></p>
+  </div>
+
+  <div class="panel">
+    <p class="eyebrow">Containment Actions</p>
+    <ul class="compact-list">
+      {% for action in actions %}
+      <li>{{ action.action_type }} · {{ action.entity_type }}={{ action.entity_value }}</li>
+      {% else %}
+      <li>No containment actions linked yet.</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="panel span-two">
+    <p class="eyebrow">Linked Auth Event</p>
+    {% if auth_event %}
+    <table class="data-table">
+      <tbody>
+        <tr><th>ID</th><td>{{ auth_event.id }}</td></tr>
+        <tr><th>Created</th><td>{{ auth_event.created_at }}</td></tr>
+        <tr><th>Event</th><td>{{ auth_event.event_type }}</td></tr>
+        <tr><th>Outcome</th><td>{{ auth_event.outcome }}</td></tr>
+        <tr><th>IP</th><td>{{ auth_event.source_ip }}</td></tr>
+        <tr><th>Geo</th><td>{{ auth_event.country_code or "unknown" }} / {{ auth_event.city or "unknown" }}</td></tr>
+        <tr><th>Risk Flags</th><td>{{ auth_event.risk_flags|join(", ") if auth_event.risk_flags else "none" }}</td></tr>
+      </tbody>
+    </table>
+    {% else %}
+    <p class="hint">This detection was created out of band by the Datadog webhook path.</p>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

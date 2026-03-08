@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Analyst Detections{% endblock %}
+{% block body %}
+<section class="panel">
+  <p class="eyebrow">{{ settings.analyst_label }}</p>
+  <h1>Detection queue</h1>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Status</th>
+        <th>Type</th>
+        <th>Occurred</th>
+        <th>Subject</th>
+        <th>ATT&CK</th>
+        <th>Containment</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for detection in detections %}
+      <tr>
+        <td>{{ detection.status }}</td>
+        <td><a href="/analyst/detections/{{ detection.id }}">{{ detection.detection_type }}</a></td>
+        <td>{{ detection.occurred_at }}</td>
+        <td>{{ detection.subject_type }}: {{ detection.subject_value }}</td>
+        <td>{{ detection.mitre_attack_id }}</td>
+        <td>{{ detection.containment_state }}</td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="6">No detections have been generated yet.</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

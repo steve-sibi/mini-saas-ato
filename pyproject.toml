@@ -1,0 +1,40 @@
+[project]
+name = "ato-sentinel"
+version = "0.1.0"
+description = "Resume-grade account takeover detection platform built with FastAPI, Postgres, and Datadog."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "alembic>=1.16.0,<2.0.0",
+    "argon2-cffi>=23.1.0,<24.0.0",
+    "email-validator>=2.2.0,<3.0.0",
+    "fastapi>=0.116.0,<0.117.0",
+    "geoip2>=5.1.0,<6.0.0",
+    "httpx>=0.28.0,<0.29.0",
+    "itsdangerous>=2.2.0,<3.0.0",
+    "jinja2>=3.1.0,<4.0.0",
+    "psycopg[binary]>=3.2.0,<4.0.0",
+    "pyotp>=2.9.0,<3.0.0",
+    "python-multipart>=0.0.20,<0.0.21",
+    "pydantic-settings>=2.10.0,<3.0.0",
+    "sqlalchemy>=2.0.36,<3.0.0",
+    "uvicorn[standard]>=0.35.0,<0.36.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3.0,<9.0.0",
+    "pytest-cov>=6.0.0,<7.0.0",
+]
+
+[build-system]
+requires = ["hatchling>=1.26.0"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["ato_sentinel"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+

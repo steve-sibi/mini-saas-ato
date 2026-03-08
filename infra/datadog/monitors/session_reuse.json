@@ -1,18 +1,18 @@
 {
-  "name": "ATO: Session Reuse (sid\u2192multi device)",
+  "name": "ATO-002 Session Reuse",
   "type": "log alert",
-  "query": "logs('evt:login AND outcome:success').rollup('cardinality','@device_hash').by('@usr','@sid').over('last_5m') > 1",
-  "message": "@webhook-ato-contain Session reused across devices",
+  "query": "logs(\"service:ato-sentinel @event_type:session_access @risk_flags:session_reuse_suspected\").index(\"main\").rollup(\"count\").by(\"@session_id\").last(\"15m\") >= 1",
+  "message": "Session cookie reuse suspected. Route to webhook containment for session revoke.",
   "tags": [
-    "service:mini-ato-saas",
-    "env:prod",
-    "usecase:ato"
+    "service:ato-sentinel",
+    "usecase:ato",
+    "mitre:T1550.004"
   ],
   "options": {
-    "evaluation_delay": 60,
-    "include_tags": true,
     "thresholds": {
       "critical": 1
-    }
+    },
+    "include_tags": true,
+    "evaluation_delay": 60
   }
 }

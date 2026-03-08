@@ -1,36 +1,61 @@
 <!doctype html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mini ATO SaaS</title>
-  <!-- Datadog RUM -->
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}ATO Sentinel{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}">
+  {% if settings.rum_app_id and settings.rum_client_token %}
   <script
-    src="https://www.datadoghq-browser-agent.com/us5/v6/datadog-rum.js"
-    type="text/javascript">
+    src="https://www.datadoghq-browser-agent.com/{{ settings.dd_site.replace('.datadoghq.com', '') }}/v6/datadog-rum.js"
+    defer>
   </script>
   <script>
-      window.DD_RUM && window.DD_RUM.init({
-        clientToken: 'pub829e85a6afd1ba584062d2445b785188',
-        applicationId: '659f63dd-4021-43a5-bb01-2bf42719aed6',
-        // `site` refers to the Datadog site parameter of your organization
-        // see https://docs.datadoghq.com/getting_started/site/
-        site: 'us5.datadoghq.com',
-        service: 'rum-ato-project',
-        env: '<ENV_NAME>',
-        // Specify a version number to identify the deployed version of your application in Datadog
-        // version: '1.0.0',
+    window.addEventListener('DOMContentLoaded', function () {
+      if (!window.DD_RUM) return;
+      window.DD_RUM.init({
+        applicationId: '{{ settings.rum_app_id }}',
+        clientToken: '{{ settings.rum_client_token }}',
+        site: '{{ settings.dd_site }}',
+        service: '{{ settings.dd_service }}',
+        env: '{{ settings.dd_env }}',
         sessionSampleRate: 100,
         sessionReplaySampleRate: 20,
-        trackBfcacheViews: true,
+        trackUserInteractions: true,
         defaultPrivacyLevel: 'mask-user-input',
       });
+    });
   </script>
-  </script>
-  <script src="{{ url_for('static', filename='device.js') }}"></script>
-
+  {% endif %}
 </head>
-<body>
-  {% block body %}{% endblock %}
+<body data-csrf-token="{{ csrf_token }}" data-csrf-cookie-name="{{ settings.csrf_cookie_name }}">
+  <div class="page-shell">
+    <header class="topbar">
+      <a class="brand" href="/">ATO Sentinel</a>
+      <nav class="nav">
+        <a href="/mitre">MITRE</a>
+        {% if current_user %}
+        <a href="/account/security">Account</a>
+        <a href="/analyst/detections">Analyst</a>
+        <form method="post" action="/auth/logout" class="inline-form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <button class="link-button" type="submit">Logout</button>
+        </form>
+        {% else %}
+        <a href="/auth/login">Login</a>
+        <a href="/auth/register">Register</a>
+        {% endif %}
+      </nav>
+    </header>
+
+    <main class="content">
+      {% block body %}{% endblock %}
+    </main>
+  </div>
+  <script src="https://unpkg.com/htmx.org@2.0.7" integrity="sha384-HGfztofotfshcF7+8n44JQL2oJmowVChPTg48S+jvZoztPfvwD79OC/LTtG6dMp+" crossorigin="anonymous"></script>
+  <script src="{{ url_for('static', path='app.js') }}"></script>
 </body>
 </html>

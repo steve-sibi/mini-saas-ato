@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Enroll MFA{% endblock %}
+{% block body %}
+<section class="auth-layout">
+  <div class="panel auth-panel">
+    <p class="eyebrow">TOTP Enrollment</p>
+    <h1>Enable MFA</h1>
+    {% if notice %}
+    <p class="flash flash-ok">{{ notice }}</p>
+    {% endif %}
+    {% if error %}
+    <p class="flash flash-error">{{ error }}</p>
+    {% endif %}
+    <p class="hint">Add this secret to your authenticator app: <code>{{ secret }}</code></p>
+    <form method="post" action="/auth/mfa/enroll" class="stack">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <input type="hidden" name="ticket" value="{{ ticket }}">
+      <label>
+        <span>Verification code</span>
+        <input name="totp_code" inputmode="numeric" autocomplete="one-time-code" required>
+      </label>
+      <button class="button button-primary" type="submit">
+        {% if pending_login %}Enable MFA and continue{% else %}Enable MFA{% endif %}
+      </button>
+    </form>
+  </div>
+</section>
+{% endblock %}

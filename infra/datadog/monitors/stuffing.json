@@ -1,19 +1,18 @@
 {
-  "name": "ATO: Credential Stuffing (IP→Many Users)",
+  "name": "ATO-001 Password Spray",
   "type": "log alert",
-  "query": "logs('evt:login AND outcome:fail').index('main').rollup('count').by('@ip').over('last_5m') > 10",
-  "message": "@webhook-ato-contain High volume auth fails from same IP",
+  "query": "logs(\"service:ato-sentinel @event_type:login @outcome:fail @risk_flags:password_spray_suspected\").index(\"main\").rollup(\"count\").by(\"@source_ip\").last(\"10m\") >= 1",
+  "message": "Password spray suspected against multiple accounts. Route to webhook containment for IP challenge mode.",
   "tags": [
-    "service:mini-ato-saas",
-    "env:prod",
-    "usecase:ato"
+    "service:ato-sentinel",
+    "usecase:ato",
+    "mitre:T1110.003"
   ],
   "options": {
-    "evaluation_delay": 60,
-    "include_tags": true,
-    "notify_audit": false,
     "thresholds": {
-      "critical": 10
-    }
+      "critical": 1
+    },
+    "include_tags": true,
+    "evaluation_delay": 60
   }
 }

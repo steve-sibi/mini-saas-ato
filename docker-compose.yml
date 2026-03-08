@@ -1,0 +1,28 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ato_sentinel
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  app:
+    build: .
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/ato_sentinel
+      APP_SECRET_KEY: local-app-secret
+      CSRF_SECRET_KEY: local-csrf-secret
+      DATADOG_WEBHOOK_SECRET: local-webhook-secret
+      DD_ENV: dev
+      DD_SERVICE: ato-sentinel
+    ports:
+      - "8000:8000"
+
+volumes:
+  pgdata:

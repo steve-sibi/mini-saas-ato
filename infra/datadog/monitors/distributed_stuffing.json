@@ -1,0 +1,18 @@
+{
+  "name": "ATO-004 Distributed Credential Stuffing",
+  "type": "log alert",
+  "query": "logs(\"service:ato-sentinel @event_type:login @outcome:fail @risk_flags:distributed_credential_stuffing_suspected\").index(\"main\").rollup(\"count\").by(\"@email\").last(\"15m\") >= 1",
+  "message": "Distributed credential stuffing suspected against one account. Route to webhook containment for account challenge mode.",
+  "tags": [
+    "service:ato-sentinel",
+    "usecase:ato",
+    "mitre:T1110.004"
+  ],
+  "options": {
+    "thresholds": {
+      "critical": 1
+    },
+    "include_tags": true,
+    "evaluation_delay": 60
+  }
+}

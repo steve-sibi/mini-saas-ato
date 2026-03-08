@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Register{% endblock %}
+{% block body %}
+<section class="auth-layout">
+  <div class="panel auth-panel">
+    <p class="eyebrow">New Account</p>
+    <h1>Register a demo user</h1>
+    {% if error %}
+    <p class="flash flash-error">{{ error }}</p>
+    {% endif %}
+    <form method="post" class="stack">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>
+        <span>Email</span>
+        <input name="email" type="email" value="{{ email or '' }}" autocomplete="username" required>
+      </label>
+      <label>
+        <span>Password</span>
+        <input name="password" type="password" autocomplete="new-password" required>
+      </label>
+      <button class="button button-primary" type="submit">Create account</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

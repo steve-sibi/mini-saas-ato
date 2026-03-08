@@ -1,9 +1,10 @@
 import requests
-APP = "https://YOURAPP.herokuapp.com"
+
+APP = "https://mini-ato-saas-3190e0d8aaa2.herokuapp.com"
 s = requests.Session()
 # Legit login to get a cookie
-s.post(f"{APP}/register", data={"email":"alice@example.com","password":"P@ssw0rd!"})
-s.post(f"{APP}/login", data={"email":"alice@example.com","password":"P@ssw0rd!"})
+s.post(f"{APP}/register", data={"email": "alice@example.com", "password": "P@ssw0rd!"})
+s.post(f"{APP}/login", data={"email": "alice@example.com", "password": "P@ssw0rd!"})
 cookie = s.cookies.get_dict()
 
 # Reuse the cookie in a second session (pretend different device)

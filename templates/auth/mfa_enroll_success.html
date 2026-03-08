@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}MFA Enabled{% endblock %}
+{% block body %}
+<section class="panel">
+  <p class="eyebrow">Recovery Material</p>
+  <h1>MFA is active</h1>
+  <p class="hint">These backup codes are shown once. Store them securely.</p>
+  <div class="code-grid">
+    {% for code in backup_codes %}
+    <code>{{ code }}</code>
+    {% endfor %}
+  </div>
+  <div class="actions">
+    {% if pending_login %}
+    <a class="button button-primary" href="/account/security">Continue to account security</a>
+    {% else %}
+    <a class="button button-primary" href="/account/security">Back to account security</a>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

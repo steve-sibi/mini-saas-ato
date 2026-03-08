@@ -1,262 +1,265 @@
-# Mini ATO SaaS - Heroku + Datadog + Azure (end-to-end)
+# ATO Sentinel
 
-A compact, production-style lab that demonstrates **account takeover (ATO) detection and response**:
+ATO Sentinel is a resume-grade **Account Takeover detection platform** built as a single FastAPI app. It combines a user auth portal, an account security center, an analyst view, inline risk detections, and Datadog-ready telemetry.
 
-- **App**: Flask auth service (register/login, optional TOTP), Postgres (SQLAlchemy), Redis (Flask-Session), server-side device fingerprinting.
-    
-- **Telemetry**: Structured JSON logs, browser RUM, clean `service`/`env` tagging.
-    
-- **Detections-as-code**: Datadog log rules for **credential stuffing** and **session reuse** (cookie hijack), plus attack scripts to validate.
-    
-- **Auto-containment**: Datadog -> Webhook -> Azure Function (HMAC) -> `/contain/revoke` to invalidate risky sessions.
-    
-- **Docs/Runbooks**: Playbooks and monitor JSON you can import directly.
+## What the project does
 
+- **User auth flows**: register, sign in, sign out, enable TOTP MFA, use single-use backup codes.
+- **Real session control**: sessions are stored in Postgres with revocation by `sid`, device binding, expiry, and last-seen metadata.
+- **Inline risk detections**:
+  - `ATO-001` Password Spray (`T1110.003`)
+  - `ATO-002` Session Cookie Reuse (`T1550.004`)
+  - `ATO-003` Impossible Travel / Valid Accounts Abuse (`T1078`, `T1078.004`)
+  - `ATO-004` Distributed Credential Stuffing (`T1110.004`)
+- **Containment**:
+  - IP or account challenge mode via `challenge_rules`
+  - direct session revocation
+  - account step-up enforcement for risky travel
+- **Analyst workflow**: minimal detections list and detail view with linked auth events, containment actions, MITRE IDs, and runbooks.
+- **Cloud-ready telemetry**: structured JSON logs to stdout, Datadog RUM support, and Datadog monitor JSON artifacts.
 
-## Architecture
+## Stack
 
-```
-Browser ──(login + RUM)──> Flask (Heroku)
-   │                         │
-   │      JSON logs          ├──> Heroku Logplex drain ──> Datadog Logs/Cloud SIEM
-   └─────────────────────────┘
-                                  /\                        │
-                                  │  Alerts / Webhook       │
-                                  └───── Datadog Monitors <─┘
-                                                    │
-                                           Azure Function (HMAC)
-                                                    │
-                                           POST /contain/revoke (Flask)
-```
+- **Backend**: FastAPI, Jinja2, HTMX
+- **Database**: Postgres, SQLAlchemy 2.0, Alembic
+- **Security**: Argon2id, TOTP, backup codes, CSRF tokens, Turnstile challenge mode
+- **Detection**: in-app risk logic with Datadog alerting/webhook integration
+- **GeoIP**: MaxMind GeoLite2-City with graceful degradation when unavailable
+- **Runtime**: Python `3.13`, `pyproject.toml`, `uv`
 
-**Key signals**
+## Repo layout
 
-- `evt`, `outcome`, `email`, `ip`, `usr`, `sid`, `device_hash`, `user-agent` (etc.)
-    
-- RUM events in **Digital Experience** for UI/behavioral context.
-
-## Repo Layout
-
-```
+```text
 .
-├─ app.py                # Flask app factory, session config, RUM env
-├─ auth.py               # Blueprint: register/login/MFA, logging, contain/revoke
-├─ db.py                 # SQLAlchemy engine/session
-├─ models.py             # User model
-├─ device.py             # device_hash() using CH/UA/IP + extra client hints
-├─ templates/            # base.html, login.html, register.html, dashboard.html
-├─ static/device.js      # lightweight client hints -> hidden field
-├─ scripts/attack/       # spray.py, session_reuse.py (simulations)
-├─ datadog/monitors/     # stuffing.json, session_reuse.json (import into DD)
-├─ runbooks/             # ATO-001/2/3.md (investigation & response steps)
-├─ Procfile              # web: gunicorn app:app
-├─ requirements.txt      # pins incl. bcrypt==3.2.2
-├─ README.md             # README for project   
-└─ runtime.txt           # python runtime for Heroku
+├── ato_sentinel/               # FastAPI app package
+├── alembic/                    # Schema migrations
+├── infra/datadog/monitors/     # Datadog monitor JSON
+├── runbooks/                   # Detection runbooks
+├── scripts/simulate/           # Demo attack simulations
+├── static/                     # App JS + styles
+├── templates/                  # Server-rendered UI
+├── tests/                      # Pytest suite
+├── Dockerfile
+├── docker-compose.yml
+├── Makefile
+├── Procfile
+└── pyproject.toml
 ```
 
-## Prerequisites
+## Local development
 
-- Python 3.11+ (local), or just deploy to Heroku.
-    
-- Datadog account (**us5**) with **DD API key**.
-    
-- (Optional) Azure Functions (HTTP trigger) if you want auto-containment.
+Recommended workflow: **hybrid local dev**.
 
-## Quickstart (Local)
+- Run Postgres in Docker for parity.
+- Run the FastAPI app on the host with auto-reload for the inner loop.
+
+### 1. Prerequisites
+
+- Python `3.13`
+- `uv`
+- Docker Desktop or a Docker-compatible engine
+
+If `uv` is not installed yet:
 
 ```bash
-# 1) Create a virtualenv
-python3 -m venv .venv && source .venv/bin/activate
-
-# 2) Install deps
-pip install -r requirements.txt
-
-# 3) Env vars (example)
-export FLASK_SECRET=$(python -c 'import secrets; print(secrets.token_hex(16))')
-export ATO_HMAC_SECRET=$(python -c 'import secrets; print(secrets.token_hex(32))')
-# For local dev you can use sqlite + local redis:
-export DATABASE_URL="sqlite:///dev.db"
-export REDIS_URL="redis://localhost:6379/0"
-
-# 4) Run
-python app.py
-
-# open http://localhost:8000
+python3 -m pip install uv
 ```
 
-The app auto-creates tables via SQLAlchemy on first hit (or at startup depending on your version). If you use Postgres locally, set `DATABASE_URL=postgresql+psycopg2://...`.
-
-## Deploy to Heroku (via GitHub, not Heroku Git)
-
-1. **Create app** and connect your GitHub repo in the Heroku dashboard (Deploy tab).
-    
-2. **Add-ons**
+### 2. Start Postgres
 
 ```bash
-heroku addons:create heroku-postgresql:essential-0 -a <APP>
-heroku addons:create heroku-redis:mini -a <APP>    # or hobby/basic if needed
+docker compose up db
 ```
 
-3. **Buildpacks (order matters)**
-
-```
-heroku buildpacks:clear -a <APP>
-heroku buildpacks:add heroku/python -a <APP>
-heroku buildpacks:add https://github.com/DataDog/heroku-buildpack-datadog -a <APP>
-```
-
-4. **Config vars**  
-    Generate secrets locally, then set (adjust `DD_SITE` if not us5):
+### 3. Create an environment file
 
 ```bash
-heroku config:set -a <APP> \
-  FLASK_SECRET=$(python -c 'import secrets; print(secrets.token_hex(16))') \
-  ATO_HMAC_SECRET=$(python -c 'import secrets; print(secrets.token_hex(32))') \
-  DD_API_KEY=<YOUR_DD_API_KEY> \
-  DD_SITE=us5.datadoghq.com \
-  DD_SERVICE=mini-ato-saas \
-  DD_ENV=prod
+cp .env.example .env
 ```
-After scouring through documentation, I found out that Postgres/Redis URLs are injected automatically (`DATABASE_URL`, `REDIS_TLS_URL`/`REDIS_URL`).
 
-5. **Datadog logs (Logplex drain)**  
-Agent buildpack doesn’t collect router/app logs; add the HTTPS drain:
+The default `DATABASE_URL` already points at the Compose Postgres instance.
+
+### 4. Install dependencies and migrate
 
 ```bash
-SERVICE=mini-ato-saas
-heroku drains:add \
-"https://http-intake.logs.us5.datadoghq.com/api/v2/logs?dd-api-key=$DD_API_KEY&ddsource=heroku&service=$SERVICE&ddtags=env:prod,service:$SERVICE,usecase:ato" \
- -a <APP>
+uv sync
+uv run alembic upgrade head
 ```
 
-6. **Deploy**  
-From the Heroku dashboard -> Deploy tab -> **Deploy Branch**.
-
-7. **Scale & Health**
+### 5. Run the app
 
 ```bash
-heroku ps:scale web=1 -a <APP>
-open https://<APP>.herokuapp.com/__health     # -> ok
+uv run uvicorn app:app --reload --host 0.0.0.0 --port 8000
 ```
 
-## Datadog setup
+Open `http://127.0.0.1:8000`.
 
-### 1) RUM (Browser monitoring)
+### Full-stack Docker path
 
-- In Datadog **Digital Experience -> RUM -> Applications**, create a Browser app (site **us5**).
-    
-- Copy **applicationId** and **clientToken**.
-    
-- Set on Heroku:
+If you want the zero-setup path instead of the hybrid workflow:
 
 ```bash
-heroku config:set -a <APP> RUM_APP_ID=<appId> RUM_CLIENT_TOKEN=<clientToken>
+docker compose up --build
 ```
 
-- `templates/base.html` already loads the us5 CDN async snippet (copied from Datadog RUM) and initializes RUM using those env vars.
+## GeoIP setup
 
-### 2) Parse app logs (JSON -> attributes)
+GeoIP enrichment is optional. The app still runs without it.
 
-- Go to **Logs -> Configuration -> Pipelines -> New**
-    
-    - Filter: `service:mini-ato-saas @syslog.appname:app`
-        
-    - Processor: **Parse -> JSON** (source **message**, merge into root)
-        
-    - (Optional) **Status remapper** from `level`.
-        
-- In **Logs -> Explorer**, filter `service:mini-ato-saas @syslog.appname:app` and confirm you see fields like `evt`, `outcome`, `email`, `ip`, `sid`, `device_hash`.
-    
-- (Optional) Promote facets for `evt`, `outcome`, `ip`, `sid`, `device_hash` (hover field -> gear -> **Create facet**).
+- If `GEOIP_DB_PATH` exists, the app uses it.
+- Else, if `MAXMIND_LICENSE_KEY` is set, the app downloads GeoLite2-City into `/tmp` at startup.
+- Else, impossible-travel analytics degrade gracefully and the rest of the app still works.
 
-### 3) Import detections (monitors)
-
-Import JSON from `datadog/monitors/`:
-
-- **Credential Stuffing** (`stuffing.json`)  
-    Query (demo threshold):
-
-```sql
-logs('service:mini-ato-saas @syslog.appname:app evt:login AND outcome:fail')
-  .index('main').rollup('count').by('@ip').over('last_5m') > 10
-```
-Set **critical=10** for demos (tune up later).
-
-- **Session Reuse** (`session_reuse.json`)
-
-```sql
-logs('service:mini-ato-saas @syslog.appname:app evt:login AND outcome:success')   
-    .rollup('cardinality','@device_hash').by('@usr','@sid').over('last_5m') > 1
-```
-> **Note:** The app logs include a stable `sid` on successful login. If you don’t see it, ensure `auth.py` sets `session["sid"] = secrets.token_hex(16)` and logs it.
-
-### 4) Cloud SIEM (Optional approach I came across when learning Datadog)
-
-Instead of Monitors, you can create **Security -> Cloud SIEM -> Detection Rules (Log)** with the same queries + MITRE metadata to emit **Security Signals**.
-
-## Auto-containment (optional step but recommended)
-This was more for my curiosity to understand the use of cloud services (such as Azure) to contain threats with the use of Webhooks.
-
-1) **Azure Function** (HTTP trigger)
-    
-    - Reads JSON `{ "sid": "...", "usr": "...", "reason": "...", ... }`
-        
-    - Computes HMAC with `ATO_HMAC_SECRET`
-        
-    - POST to `https://<APP>.herokuapp.com/contain/revoke` with header `X-ATO-Signature: <hex>`
-        
-2) **Datadog Webhook**
-    
-    - **Integrations -> Webhooks**: name `ato-contain`, URL = your Function endpoint.
-        
-    - Set monitor message to include `@webhook-ato-contain`.
-        
-    - Example payload (Datadog -> Function):
-
-    ```json
-    {
-        "sid": "${sid}",
-        "usr": "${usr.name}",
-        "ip": "${network.client.ip}",
-        "reason": "${alert_title}",
-        "monitor": "${monitor.name}"
-    }
-    ```
-
-3) **Flask endpoint**  
-`/contain/revoke` verifies HMAC, clears the session, logs `evt:contain action:revoke`.
-
-## Attack Simulations (purple team)
-Ran these attacks locally to the cloud instance on Heroku to generate signals:
+To fetch the database locally:
 
 ```bash
-# 1) Credential stuffing (30 bad logins) -> should exceed >10 in 5m
-python scripts/attack/spray.py
-
-# 2) Session reuse (cookie replay from another device) -> multiple device_hash per sid
-python scripts/attack/session_reuse.py
+export MAXMIND_LICENSE_KEY=...
+make geoip
 ```
-Then check **Monitors** and **Logs -> Explorer** (group by `@ip`, `@sid`, `@device_hash`) and RUM sessions.
 
-## Security notes & gotchas
+## Running tests
 
-- **Redis TLS**: Some Heroku Redis endpoints present a self-signed CA. The app appends `ssl_cert_reqs=none` to `rediss://` for my lab. For production, I'd suggest a proper CA bundle in an `ssl.SSLContext`.
-    
-- **bcrypt**: `passlib[bcrypt]==1.7.4` requires **bcrypt < 4**. `requirements.txt` pins `bcrypt==3.2.2`. (planning to update this in the future)
-    
-- **Heroku Postgres plan**: use `heroku-postgresql:essential-0` (the old `mini` plan is EOL - incase you haven't used Heroku in a while).
-    
-- **Procfile**: `web: gunicorn app:app` (ensure `gunicorn` is in `requirements.txt`).
-    
-- **RUM site**: set `DD_SITE=us5.datadoghq.com` to match your Datadog region. (us5 was the case for me, but it can be different for you, so always check this in your browser)
-    
-- **Facets (Datadog)**: creation isn’t retroactive, generate a few new events after adding these.
+```bash
+uv run pytest
+```
 
-## MITRE & detection mapping (cheat sheet as I add more attacks down the line)
+The tests use a SQLite database file created inside the test temp directory.
 
-|Use case|Signal/Rule|ATT&CK|
-|---|---|---|
-|Credential stuffing|Many `evt:login outcome:fail` by same `@ip`|T1110.003 (Password Spraying)|
-|Session hijack/reuse|Same `@sid` with multiple `@device_hash`|T1550.004 (Web Session Cookie)|
-|MFA abuse (Work-In-Progress)|Excessive prompts / invalid TOTP attempts|T1621 (Multi-Factor Auth Interception/Abuse)|
+## Demo simulations
+
+All simulation scripts assume the app is reachable at `http://127.0.0.1:8000`. Override with `ATO_BASE_URL` if needed.
+
+```bash
+uv run python scripts/simulate/password_spray.py
+uv run python scripts/simulate/distributed_stuffing.py
+uv run python scripts/simulate/session_cookie_reuse.py
+uv run python scripts/simulate/impossible_travel.py
+```
+
+Notes:
+
+- The simulation scripts use `X-Forwarded-For` and `X-Device-Entropy` so they can exercise the detection logic without a browser.
+- The impossible-travel simulation uses debug geo headers, which are enabled only outside production.
+
+## Datadog integration
+
+### Logs
+
+The app emits structured JSON to stdout. Parse fields like:
+
+- `event_type`
+- `outcome`
+- `email`
+- `session_id`
+- `source_ip`
+- `device_fingerprint`
+- `risk_flags`
+- `risk_score`
+
+### RUM
+
+Set:
+
+- `RUM_APP_ID`
+- `RUM_CLIENT_TOKEN`
+- `DD_SITE`
+- `DD_SERVICE`
+- `DD_ENV`
+
+### Monitors
+
+Import monitor JSON from `infra/datadog/monitors/`:
+
+- `stuffing.json`
+- `session_reuse.json`
+- `impossible_travel.json`
+- `distributed_stuffing.json`
+
+### Webhook containment
+
+The internal webhook endpoint is:
+
+```text
+POST /internal/datadog/contain
+```
+
+Two auth modes are implemented:
+
+- **Preferred**: HMAC headers
+  - `X-ATO-Timestamp`
+  - `X-ATO-Signature = hex(hmac_sha256(secret, timestamp + "." + raw_body))`
+- **Datadog-compatible fallback**: static header
+  - `X-ATO-Webhook-Token`
+
+The fallback exists because Datadog custom webhooks support custom headers and payloads, but not arbitrary body HMAC signing. The app accepts both so the project is directly deployable without a relay service.
+
+Expected JSON payload:
+
+```json
+{
+  "alert_id": "unique-alert-id",
+  "detection_type": "ATO-001",
+  "entity_type": "ip",
+  "entity_value": "198.51.100.17",
+  "occurred_at": "2026-03-08T12:00:00+00:00",
+  "monitor_name": "ATO-001 Password Spray"
+}
+```
+
+`alert_id` is treated idempotently.
+
+## Heroku deployment
+
+### Runtime
+
+- Use **Heroku Cedar-generation apps** on `heroku-24`
+- Use **Heroku Postgres Essential-0**
+- Set the Python runtime through `.python-version`
+
+### Procfile
+
+This repo uses:
+
+```text
+release: uv run alembic upgrade head
+web: uv run uvicorn app:app --host 0.0.0.0 --port ${PORT:-8000}
+```
+
+### Required config vars
+
+```text
+DATABASE_URL
+APP_SECRET_KEY
+CSRF_SECRET_KEY
+DATADOG_WEBHOOK_SECRET
+TURNSTILE_SITE_KEY
+TURNSTILE_SECRET_KEY
+DD_SITE
+DD_SERVICE
+DD_ENV
+RUM_APP_ID
+RUM_CLIENT_TOKEN
+GEOIP_DB_PATH
+MAXMIND_LICENSE_KEY
+```
+
+### Recommended extras
+
+- Datadog HTTP log drain
+- Cloudflare Turnstile site + secret keys
+
+## MITRE ATT&CK mapping
+
+| Detection | ATT&CK |
+| --- | --- |
+| ATO-001 Password Spray | `T1110.003` |
+| ATO-002 Session Cookie Reuse | `T1550.004` |
+| ATO-003 Impossible Travel / Valid Accounts Abuse | `T1078`, `T1078.004` |
+| ATO-004 Distributed Credential Stuffing | `T1110.004` |
+
+## Current implementation notes
+
+- Analyst routes are intentionally minimal in v1: list view plus detail view.
+- GeoIP is optional and degrades cleanly when not configured.
+- Turnstile bypasses to `dev-bypass` when no secret key is configured, which keeps local development friction low.
+- The legacy `scripts/attack/` directory is still present for reference, but the supported demo scripts live in `scripts/simulate/`.
