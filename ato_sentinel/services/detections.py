@@ -23,6 +23,13 @@ class DetectionSpec:
     runbook_path: str
 
 
+@dataclass(frozen=True)
+class LoginRequirements:
+    turnstile_required: bool
+    step_up_required: bool
+    reasons: list[str]
+
+
 DETECTION_SPECS = {
     "ATO-001": DetectionSpec(
         code="ATO-001",
@@ -171,17 +178,26 @@ def _create_containment_action(
     return action
 
 
-def challenge_required_for_login(db: Session, source_ip: str, email: str | None) -> tuple[bool, list[str]]:
+def get_login_requirements(db: Session, source_ip: str, email: str | None) -> LoginRequirements:
     active_rules = db.scalars(
         select(ChallengeRule).where(ChallengeRule.expires_at >= utcnow())
     ).all()
+    turnstile_required = False
+    step_up_required = False
     reasons: list[str] = []
     for rule in active_rules:
         if rule.scope == "ip" and rule.key == source_ip:
+            turnstile_required = True
             reasons.append(rule.reason)
         if email and rule.scope == "account" and rule.key == email:
+            turnstile_required = True
+            step_up_required = True
             reasons.append(rule.reason)
-    return bool(reasons), reasons
+    return LoginRequirements(
+        turnstile_required=turnstile_required,
+        step_up_required=step_up_required,
+        reasons=reasons,
+    )
 
 
 def evaluate_login_failure(db: Session, event: AuthEvent) -> list[Detection]:
@@ -353,7 +369,14 @@ def evaluate_login_success(
         auth_event_id=event.id,
         dedupe_window=timedelta(hours=6),
     )
-    user.step_up_required_until = event_created_at + timedelta(hours=24)
+    _ensure_challenge_rule(
+        db,
+        scope="account",
+        key=user.email,
+        reason="impossible_travel",
+        detection_id=detection.id,
+        expires_at=event_created_at + timedelta(hours=24),
+    )
     revoked = revoke_other_sessions(db, user.id, keep_sid=session_record.sid)
     _create_containment_action(
         db,
@@ -477,14 +500,8 @@ def apply_webhook_containment(
             key=entity_value,
             reason="datadog_webhook",
             detection_id=detection.id,
-            expires_at=occurred_at + timedelta(minutes=30),
+            expires_at=occurred_at + timedelta(hours=24),
         )
-        user = db.scalar(select(User).where(User.email == entity_value))
-        if user:
-            user.step_up_required_until = max(
-                ensure_utc(user.step_up_required_until) or occurred_at,
-                occurred_at + timedelta(hours=24),
-            )
         action_type = "challenge_account"
         detection.containment_state = "challenged"
     else:

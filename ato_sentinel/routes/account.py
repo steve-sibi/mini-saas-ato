@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ato_sentinel.deps import enforce_csrf, get_db, require_authenticated
-from ato_sentinel.models import AuthEvent, Detection, UserSession
+from ato_sentinel.models import AuthEvent, ChallengeRule, Detection, UserSession, utcnow
 from ato_sentinel.services.authentication import revoke_session
 from ato_sentinel.services.detections import _create_containment_action
 from ato_sentinel.services.events import emit_auth_event, persist_auth_event
@@ -31,6 +31,13 @@ def security_center(
     detections = db.scalars(
         select(Detection).where(Detection.user_id == auth_context.user.id).order_by(Detection.occurred_at.desc()).limit(10)
     ).all()
+    account_step_up_active = db.scalar(
+        select(ChallengeRule.id).where(
+            ChallengeRule.scope == "account",
+            ChallengeRule.key == auth_context.user.email,
+            ChallengeRule.expires_at >= utcnow(),
+        )
+    ) is not None
     return template_response(
         request,
         "account/security.html",
@@ -38,6 +45,7 @@ def security_center(
         sessions=active_sessions,
         recent_events=recent_events,
         detections=detections,
+        account_step_up_active=account_step_up_active,
     )
 
 
@@ -47,7 +55,7 @@ def revoke_session_post(
     sid: str,
     db: Session = Depends(get_db),
     auth_context=Depends(require_authenticated),
-    csrf_token: str = Form(),
+    csrf_token: str | None = Form(default=None),
 ):
     enforce_csrf(request, csrf_token)
 
@@ -83,5 +91,5 @@ def revoke_session_post(
 
     response = RedirectResponse(url="/account/security?notice=session-revoked", status_code=303)
     if sid == auth_context.session.sid:
-        response.delete_cookie(request.app.state.settings.session_cookie_name)
+        response.delete_cookie(request.app.state.settings.session_cookie_name, path="/")
     return response

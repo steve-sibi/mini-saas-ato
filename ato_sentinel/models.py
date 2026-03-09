@@ -40,10 +40,6 @@ class User(Base, TimestampMixin):
     password_hash: Mapped[str] = mapped_column(String(255))
     mfa_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
-    step_up_required_until: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True,
-    )
 
     recovery_codes: Mapped[list["MfaRecoveryCode"]] = relationship(
         back_populates="user",
@@ -81,7 +77,6 @@ class UserSession(Base):
     last_seen_country: Mapped[str | None] = mapped_column(String(8), nullable=True)
     last_seen_city: Mapped[str | None] = mapped_column(String(255), nullable=True)
     last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
-    step_up_required: Mapped[bool] = mapped_column(Boolean, default=False)
 
     user: Mapped[User] = relationship(back_populates="sessions")
 

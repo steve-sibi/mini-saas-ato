@@ -5,6 +5,11 @@ services:
       POSTGRES_DB: ato_sentinel
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ato_sentinel"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     ports:
       - "5432:5432"
     volumes:
@@ -13,7 +18,8 @@ services:
   app:
     build: .
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     environment:
       DATABASE_URL: postgresql+psycopg://postgres:postgres@db:5432/ato_sentinel
       APP_SECRET_KEY: local-app-secret
@@ -21,8 +27,21 @@ services:
       DATADOG_WEBHOOK_SECRET: local-webhook-secret
       DD_ENV: dev
       DD_SERVICE: ato-sentinel
+    command:
+      [
+        "sh",
+        "-lc",
+        "uv run alembic upgrade head && uv run uvicorn app:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/ato_sentinel --reload-dir /app/templates --reload-dir /app/static",
+      ]
     ports:
       - "8000:8000"
+    volumes:
+      - ./app.py:/app/app.py
+      - ./ato_sentinel:/app/ato_sentinel
+      - ./alembic:/app/alembic
+      - ./alembic.ini:/app/alembic.ini
+      - ./templates:/app/templates
+      - ./static:/app/static
 
 volumes:
   pgdata:

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
-import hmac
 import hashlib
+import hmac
+from datetime import datetime, timezone
 
 from ato_sentinel.security import (
+    compute_device_fingerprint,
     generate_backup_codes,
     hash_backup_code,
     hash_password,
@@ -38,3 +39,20 @@ def test_webhook_hmac_verification_accepts_valid_signature():
     ).hexdigest()
     assert verify_webhook_signature(secret, timestamp, body, signature, 60) is True
     assert verify_webhook_signature(secret, timestamp, body, "bad-signature", 60) is False
+
+
+def test_device_fingerprint_is_deterministic_and_changes_with_entropy():
+    headers = {
+        "user-agent": "Browser/1.0",
+        "accept-language": "en-US",
+        "sec-ch-ua-platform": "macOS",
+        "sec-ch-ua": '"Chromium";v="122"',
+    }
+    first = compute_device_fingerprint(headers, "laptop-a")
+    second = compute_device_fingerprint(headers, "laptop-a")
+    changed_entropy = compute_device_fingerprint(headers, "laptop-b")
+    changed_header = compute_device_fingerprint({**headers, "accept-language": "en-GB"}, "laptop-a")
+
+    assert first == second
+    assert first != changed_entropy
+    assert first != changed_header

@@ -38,7 +38,7 @@ async def datadog_contain(request: Request, db: Session = Depends(get_db)):
         raise HTTPException(status_code=403, detail="Invalid webhook signature")
 
     payload = ContainmentWebhookPayload.model_validate_json(body)
-    if not timestamp and (datetime.now(timezone.utc) - payload.occurred_at).total_seconds() > 900:
+    if not timestamp and (datetime.now(timezone.utc) - payload.occurred_at).total_seconds() > settings.webhook_fallback_tolerance_seconds:
         raise HTTPException(status_code=400, detail="Fallback webhook payload is too old")
 
     action, idempotent = apply_webhook_containment(

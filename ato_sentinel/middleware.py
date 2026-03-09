@@ -48,6 +48,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
                 httponly=False,
                 samesite="lax",
                 secure=settings.use_secure_cookies,
+                path="/",
                 max_age=60 * 60 * 24 * 30,
             )
         return response

@@ -99,6 +99,7 @@ th,
   border-radius: 24px;
   box-shadow: var(--shadow);
   backdrop-filter: blur(16px);
+  overflow: hidden;
 }
 
 .eyebrow {
@@ -254,6 +255,7 @@ button,
 .data-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
 }
 
 .data-table th,
@@ -262,6 +264,35 @@ button,
   text-align: left;
   border-bottom: 1px solid var(--line);
   vertical-align: top;
+}
+
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.cell-code code,
+.cell-date {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.cell-status,
+.cell-action {
+  white-space: nowrap;
+}
+
+.cell-action {
+  width: 1%;
+  text-align: right;
+}
+
+.cell-action .inline-form {
+  justify-content: flex-end;
+}
+
+.cell-action .button {
+  padding: 0.75rem 1rem;
 }
 
 .code-grid {
@@ -293,5 +324,10 @@ button,
   .nav {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .data-table {
+    min-width: 42rem;
+    table-layout: auto;
   }
 }

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 
 from fastapi.testclient import TestClient
 
 from ato_sentinel.models import ChallengeRule, ContainmentAction, Detection, UserSession
+from ato_sentinel.services.detections import _distance_km
 
 from tests.helpers import bootstrap_csrf
 
@@ -120,6 +121,11 @@ def test_impossible_travel_detection_and_datadog_webhook_idempotency(client):
     with client.app.state.session_factory() as db:
         impossible = db.query(Detection).filter(Detection.detection_type == "ATO-003").one()
         assert impossible.subject_value == "travel@example.com"
+        rule = db.query(ChallengeRule).filter(
+            ChallengeRule.scope == "account",
+            ChallengeRule.key == "travel@example.com",
+        ).one()
+        assert rule.reason == "impossible_travel"
 
     payload = {
         "alert_id": "alert-123",
@@ -139,3 +145,36 @@ def test_impossible_travel_detection_and_datadog_webhook_idempotency(client):
     with client.app.state.session_factory() as db:
         actions = db.query(ContainmentAction).filter(ContainmentAction.external_id == "alert-123").all()
         assert len(actions) == 1
+
+
+def test_webhook_fallback_rejects_old_payloads_and_accepts_fresh_ones(client):
+    stale_payload = {
+        "alert_id": "alert-old",
+        "detection_type": "ATO-001",
+        "entity_type": "ip",
+        "entity_value": "198.51.100.88",
+        "occurred_at": (datetime.now(timezone.utc) - timedelta(seconds=121)).isoformat(),
+        "monitor_name": "ATO-001 Password Spray",
+    }
+    headers = {"X-ATO-Webhook-Token": "test-webhook-secret"}
+    stale = client.post("/internal/datadog/contain", content=json.dumps(stale_payload), headers=headers)
+    assert stale.status_code == 400
+
+    fresh_payload = {
+        **stale_payload,
+        "alert_id": "alert-fresh",
+        "occurred_at": datetime.now(timezone.utc).isoformat(),
+    }
+    fresh = client.post("/internal/datadog/contain", content=json.dumps(fresh_payload), headers=headers)
+    assert fresh.status_code == 200
+    assert fresh.json()["idempotent"] is False
+
+
+def test_distance_km_unit_cases():
+    assert _distance_km(41.8781, -87.6298, 41.8781, -87.6298) == 0
+
+    chicago_to_tokyo = _distance_km(41.8781, -87.6298, 35.6764, 139.6500)
+    assert 10000 <= chicago_to_tokyo <= 10500
+
+    antipodal = _distance_km(0.0, 0.0, 0.0, 180.0)
+    assert 20000 <= antipodal <= 20150

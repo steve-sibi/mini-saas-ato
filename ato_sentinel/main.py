@@ -42,13 +42,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.exception_handler(AuthenticationRequired)
     async def handle_auth_required(request: Request, _: AuthenticationRequired):
         response = RedirectResponse(url="/auth/login", status_code=303)
-        response.delete_cookie(request.app.state.settings.session_cookie_name)
+        response.delete_cookie(request.app.state.settings.session_cookie_name, path="/")
         return response
 
     @app.exception_handler(SessionRiskRedirect)
     async def handle_session_risk(request: Request, exc: SessionRiskRedirect):
         response = RedirectResponse(url=f"/auth/login?error={exc.reason}", status_code=303)
-        response.delete_cookie(request.app.state.settings.session_cookie_name)
+        response.delete_cookie(request.app.state.settings.session_cookie_name, path="/")
         return response
 
     @app.get("/")

@@ -6,7 +6,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from ato_sentinel.config import Settings
-from ato_sentinel.models import MfaRecoveryCode, User, UserSession, ensure_utc, utcnow
+from ato_sentinel.models import MfaRecoveryCode, User, UserSession, utcnow
 from ato_sentinel.security import generate_session_id, hash_backup_code, hash_password
 from ato_sentinel.types import GeoContext, RequestContext
 
@@ -20,13 +20,6 @@ def create_user(db: Session, email: str, password: str) -> User:
     db.add(user)
     db.flush()
     return user
-
-
-def is_step_up_active(user: User) -> bool:
-    step_up_until = ensure_utc(user.step_up_required_until)
-    if not step_up_until:
-        return False
-    return step_up_until > utcnow()
 
 
 def issue_session(
@@ -45,7 +38,6 @@ def issue_session(
         last_seen_country=geo.country_code,
         last_seen_city=geo.city,
         last_seen_at=utcnow(),
-        step_up_required=is_step_up_active(user),
     )
     db.add(session_record)
     db.flush()

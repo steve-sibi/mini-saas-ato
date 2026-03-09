@@ -15,13 +15,12 @@ from ato_sentinel.security import generate_backup_codes, load_ticket, sign_ticke
 from ato_sentinel.services.authentication import (
     consume_backup_code,
     create_user,
-    is_step_up_active,
     issue_session,
     normalize_email,
     replace_recovery_codes,
     revoke_session,
 )
-from ato_sentinel.services.detections import challenge_required_for_login, evaluate_login_failure, evaluate_login_success
+from ato_sentinel.services.detections import evaluate_login_failure, evaluate_login_success, get_login_requirements
 from ato_sentinel.services.events import emit_auth_event, get_geo_context, persist_auth_event
 from ato_sentinel.templating import template_response
 
@@ -40,6 +39,7 @@ def _set_session_cookie(request: Request, response, sid: str) -> None:
         httponly=True,
         samesite="lax",
         secure=settings.use_secure_cookies,
+        path="/",
         max_age=settings.session_ttl_hours * 3600,
     )
 
@@ -53,30 +53,25 @@ def register_form(request: Request):
 def register_post(
     request: Request,
     db: Session = Depends(get_db),
-    csrf_token: str = Form(),
+    csrf_token: str | None = Form(default=None),
     email: str = Form(),
     password: str = Form(),
 ):
     enforce_csrf(request, csrf_token)
     normalized_email = normalize_email(email)
-    if db.scalar(select(User).where(User.email == normalized_email)):
-        return template_response(
+    user = db.scalar(select(User).where(User.email == normalized_email))
+    if not user:
+        user = create_user(db, normalized_email, password)
+        event = persist_auth_event(
+            db,
             request,
-            "auth/register.html",
-            error="That email is already registered.",
-            email=normalized_email,
+            event_type="registration",
+            outcome="success",
+            user=user,
+            email=user.email,
         )
-    user = create_user(db, normalized_email, password)
-    event = persist_auth_event(
-        db,
-        request,
-        event_type="registration",
-        outcome="success",
-        user=user,
-        email=user.email,
-    )
-    emit_auth_event(request, event)
-    db.commit()
+        emit_auth_event(request, event)
+        db.commit()
     return _redirect_with_notice("/auth/login", "account-created")
 
 
@@ -91,15 +86,15 @@ def login_form(
 ):
     if auth_context:
         return RedirectResponse(url="/account/security", status_code=303)
-    challenge_required, reasons = challenge_required_for_login(db, request.state.context.ip, normalize_email(email) if email else None)
+    requirements = get_login_requirements(db, request.state.context.ip, normalize_email(email) if email else None)
     return template_response(
         request,
         "auth/login.html",
         email=email,
         error=error,
         notice=notice,
-        challenge_required=challenge_required,
-        challenge_reasons=reasons,
+        challenge_required=requirements.turnstile_required,
+        challenge_reasons=requirements.reasons,
     )
 
 
@@ -107,16 +102,16 @@ def login_form(
 def login_post(
     request: Request,
     db: Session = Depends(get_db),
-    csrf_token: str = Form(),
+    csrf_token: str | None = Form(default=None),
     email: str = Form(),
     password: str = Form(),
     turnstile_response: str = Form(default="", alias="cf-turnstile-response"),
 ):
     enforce_csrf(request, csrf_token)
     normalized_email = normalize_email(email)
-    challenge_required, reasons = challenge_required_for_login(db, request.state.context.ip, normalized_email)
-    if challenge_required:
-        token = turnstile_response or "dev-bypass"
+    requirements = get_login_requirements(db, request.state.context.ip, normalized_email)
+    if requirements.turnstile_required:
+        token = turnstile_response
         challenge_ok, challenge_status = request.app.state.turnstile.verify(token, request.state.context.ip)
         if not challenge_ok:
             return template_response(
@@ -125,7 +120,7 @@ def login_post(
                 email=normalized_email,
                 error=f"Challenge validation failed: {challenge_status}.",
                 challenge_required=True,
-                challenge_reasons=reasons,
+                challenge_reasons=requirements.reasons,
             )
 
     user = db.scalar(select(User).where(User.email == normalized_email))
@@ -141,14 +136,14 @@ def login_post(
         detections = evaluate_login_failure(db, event)
         emit_auth_event(request, event, [item.detection_type for item in detections])
         db.commit()
-        challenge_required, reasons = challenge_required_for_login(db, request.state.context.ip, normalized_email)
+        requirements = get_login_requirements(db, request.state.context.ip, normalized_email)
         return template_response(
             request,
             "auth/login.html",
             email=normalized_email,
             error="Invalid credentials.",
-            challenge_required=challenge_required,
-            challenge_reasons=reasons,
+            challenge_required=requirements.turnstile_required,
+            challenge_reasons=requirements.reasons,
         )
 
     ticket_payload = {
@@ -157,9 +152,10 @@ def login_post(
         "device_fingerprint": request.state.context.device_fingerprint,
         "source_ip": request.state.context.ip,
         "issued_at": datetime.now(timezone.utc).isoformat(),
+        "requires_step_up": requirements.step_up_required,
     }
     settings = request.app.state.settings
-    if is_step_up_active(user) and not user.mfa_enabled:
+    if requirements.step_up_required and not user.mfa_enabled:
         secret = pyotp.random_base32()
         ticket = sign_ticket(
             settings,
@@ -176,14 +172,14 @@ def login_post(
             notice="Risk-based step-up requires MFA enrollment before sign-in completes.",
         )
 
-    if user.mfa_enabled or is_step_up_active(user):
+    if user.mfa_enabled or requirements.step_up_required:
         ticket = sign_ticket(settings, "mfa-verify", ticket_payload)
         return template_response(
             request,
             "auth/mfa_verify.html",
             ticket=ticket,
             email=user.email,
-            requires_step_up=is_step_up_active(user),
+            requires_step_up=requirements.step_up_required,
         )
 
     geo = get_geo_context(request)
@@ -209,7 +205,7 @@ def login_post(
 def mfa_verify_post(
     request: Request,
     db: Session = Depends(get_db),
-    csrf_token: str = Form(),
+    csrf_token: str | None = Form(default=None),
     ticket: str = Form(),
     totp_code: str = Form(default=""),
     backup_code: str = Form(default=""),
@@ -252,7 +248,7 @@ def mfa_verify_post(
             ticket=ticket,
             email=user.email,
             error="The TOTP code or backup code was invalid.",
-            requires_step_up=is_step_up_active(user),
+            requires_step_up=bool(payload.get("requires_step_up")),
         )
 
     geo = get_geo_context(request)
@@ -327,7 +323,7 @@ def mfa_enroll_form(
 def mfa_enroll_post(
     request: Request,
     db: Session = Depends(get_db),
-    csrf_token: str = Form(),
+    csrf_token: str | None = Form(default=None),
     ticket: str = Form(),
     totp_code: str = Form(),
 ):
@@ -409,7 +405,7 @@ def logout_post(
     request: Request,
     db: Session = Depends(get_db),
     auth_context=Depends(require_authenticated),
-    csrf_token: str = Form(),
+    csrf_token: str | None = Form(default=None),
 ):
     enforce_csrf(request, csrf_token)
     revoke_session(auth_context.session)
@@ -425,5 +421,5 @@ def logout_post(
     emit_auth_event(request, event)
     db.commit()
     response = RedirectResponse(url="/auth/login?notice=signed-out", status_code=303)
-    response.delete_cookie(request.app.state.settings.session_cookie_name)
+    response.delete_cookie(request.app.state.settings.session_cookie_name, path="/")
     return response

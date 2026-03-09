@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ato_sentinel.models import User, UserSession, ensure_utc, utcnow
+from ato_sentinel.security import constant_time_equal
 from ato_sentinel.services.detections import handle_session_reuse
 from ato_sentinel.services.events import get_geo_context
 from ato_sentinel.types import AuthenticatedContext
@@ -29,7 +30,7 @@ def get_db(request: Request):
 
 def enforce_csrf(request: Request, token: str | None) -> None:
     expected = request.state.context.csrf_token
-    if not token or token != expected:
+    if not token or not expected or not constant_time_equal(token, expected):
         raise HTTPException(status_code=403, detail="CSRF validation failed")
 
 

@@ -1,6 +1,6 @@
 # ATO Sentinel
 
-ATO Sentinel is a resume-grade **Account Takeover detection platform** built as a single FastAPI app. It combines a user auth portal, an account security center, an analyst view, inline risk detections, and Datadog-ready telemetry.
+ATO Sentinel is a PoC and Personal Project **Account Takeover detection platform** built as a single FastAPI app. It combines a user auth portal, an account security center, an analyst view, inline risk detections, and Datadog-ready telemetry.
 
 ## What the project does
 
@@ -14,7 +14,7 @@ ATO Sentinel is a resume-grade **Account Takeover detection platform** built as 
 - **Containment**:
   - IP or account challenge mode via `challenge_rules`
   - direct session revocation
-  - account step-up enforcement for risky travel
+  - account challenge rules force Turnstile and MFA step-up for risky accounts
 - **Analyst workflow**: minimal detections list and detail view with linked auth events, containment actions, MITRE IDs, and runbooks.
 - **Cloud-ready telemetry**: structured JSON logs to stdout, Datadog RUM support, and Datadog monitor JSON artifacts.
 
@@ -191,7 +191,7 @@ Two auth modes are implemented:
 - **Datadog-compatible fallback**: static header
   - `X-ATO-Webhook-Token`
 
-The fallback exists because Datadog custom webhooks support custom headers and payloads, but not arbitrary body HMAC signing. The app accepts both so the project is directly deployable without a relay service.
+The fallback exists because Datadog custom webhooks support custom headers and payloads, but not arbitrary body HMAC signing. The app accepts both so the project is directly deployable without a relay service. Fallback requests are also rejected if `occurred_at` is older than `WEBHOOK_FALLBACK_TOLERANCE_SECONDS` (120 seconds by default).
 
 Expected JSON payload:
 
@@ -261,5 +261,5 @@ MAXMIND_LICENSE_KEY
 
 - Analyst routes are intentionally minimal in v1: list view plus detail view.
 - GeoIP is optional and degrades cleanly when not configured.
-- Turnstile bypasses to `dev-bypass` when no secret key is configured, which keeps local development friction low.
-- The legacy `scripts/attack/` directory is still present for reference, but the supported demo scripts live in `scripts/simulate/`.
+- Turnstile accepts the explicit `dev-bypass` token when no secret key is configured, which keeps local development friction low without treating missing challenge responses as valid.
+- Account-level challenge rules are the single source of truth for login-time step-up requirements.

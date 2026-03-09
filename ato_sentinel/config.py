@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     csrf_cookie_name: str = "ato_csrf"
     session_ttl_hours: int = 12
     hmac_tolerance_seconds: int = 60
+    webhook_fallback_tolerance_seconds: int = Field(default=120, alias="WEBHOOK_FALLBACK_TOLERANCE_SECONDS")
     analyst_label: str = "ATO Sentinel Analyst View"
 
     @property

@@ -15,7 +15,7 @@
       </div>
       <div class="stat">
         <span>Step-up state</span>
-        <strong>{{ "Active" if current_user.step_up_required_until else "Normal" }}</strong>
+        <strong>{{ "Active" if account_step_up_active else "Normal" }}</strong>
       </div>
       <div class="stat">
         <span>Session</span>
@@ -43,63 +43,67 @@
 
   <div class="panel span-two">
     <p class="eyebrow">Active Sessions</p>
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>SID</th>
-          <th>IP</th>
-          <th>Country</th>
-          <th>Last Seen</th>
-          <th>Status</th>
-          <th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for session in sessions %}
-        <tr>
-          <td><code>{{ session.sid[:12] }}...</code></td>
-          <td>{{ session.last_seen_ip }}</td>
-          <td>{{ session.last_seen_country or "unknown" }}</td>
-          <td>{{ session.last_seen_at }}</td>
-          <td>{{ "Revoked" if session.revoked_at else "Active" }}</td>
-          <td>
-            {% if not session.revoked_at %}
-            <form method="post" action="/account/sessions/{{ session.sid }}/revoke" class="inline-form">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-              <button class="button button-danger" type="submit">Revoke</button>
-            </form>
-            {% endif %}
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>SID</th>
+            <th>IP</th>
+            <th>Country</th>
+            <th>Last Seen</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for session in sessions %}
+          <tr>
+            <td class="cell-code"><code>{{ session.sid[:12] }}...</code></td>
+            <td>{{ session.last_seen_ip }}</td>
+            <td>{{ session.last_seen_country or "unknown" }}</td>
+            <td class="cell-date">{{ session.last_seen_at }}</td>
+            <td class="cell-status">{{ "Revoked" if session.revoked_at else "Active" }}</td>
+            <td class="cell-action">
+              {% if not session.revoked_at %}
+              <form method="post" action="/account/sessions/{{ session.sid }}/revoke" class="inline-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button class="button button-danger" type="submit">Revoke</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
 
   <div class="panel span-two">
     <p class="eyebrow">Recent Auth Events</p>
-    <table class="data-table">
-      <thead>
-        <tr>
-          <th>When</th>
-          <th>Type</th>
-          <th>Outcome</th>
-          <th>IP</th>
-          <th>Risk Flags</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for event in recent_events %}
-        <tr>
-          <td>{{ event.created_at }}</td>
-          <td>{{ event.event_type }}</td>
-          <td>{{ event.outcome }}</td>
-          <td>{{ event.source_ip }}</td>
-          <td>{{ event.risk_flags|join(", ") if event.risk_flags else "none" }}</td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>When</th>
+            <th>Type</th>
+            <th>Outcome</th>
+            <th>IP</th>
+            <th>Risk Flags</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for event in recent_events %}
+          <tr>
+            <td class="cell-date">{{ event.created_at }}</td>
+            <td>{{ event.event_type }}</td>
+            <td>{{ event.outcome }}</td>
+            <td>{{ event.source_ip }}</td>
+            <td>{{ event.risk_flags|join(", ") if event.risk_flags else "none" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
 </section>
 {% endblock %}
