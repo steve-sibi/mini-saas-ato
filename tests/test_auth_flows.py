@@ -71,6 +71,7 @@ def test_mfa_enrollment_and_backup_code_login(client):
     assert login.status_code == 303
 
     enroll_page = client.get("/auth/mfa/enroll", headers={"X-Device-Entropy": "trusted-browser"})
+    assert "data:image/svg+xml;base64," in enroll_page.text
     ticket = extract_hidden_value(enroll_page.text, "ticket")
     secret = extract_secret(enroll_page.text)
     csrf = client.cookies["ato_csrf"]

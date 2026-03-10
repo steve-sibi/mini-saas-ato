@@ -140,6 +140,35 @@ p {
   gap: 1rem;
 }
 
+.mfa-enroll-stack {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.mfa-qr-card {
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  border: 1px dashed var(--line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.45);
+}
+
+.qr-preview {
+  display: block;
+  width: min(15rem, 100%);
+  height: auto;
+  background: white;
+  border-radius: 18px;
+  padding: 0.75rem;
+}
+
+.mfa-enroll-copy {
+  display: grid;
+  gap: 0.35rem;
+}
+
 label {
   display: grid;
   gap: 0.35rem;

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import io
 from datetime import datetime, timezone
 from urllib.parse import urlencode
 
@@ -29,6 +31,26 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 def _redirect_with_notice(path: str, notice: str) -> RedirectResponse:
     return RedirectResponse(url=f"{path}?{urlencode({'notice': notice})}", status_code=303)
+
+
+def _build_mfa_enrollment_context(email: str, secret: str) -> dict[str, str]:
+    provisioning_uri = pyotp.TOTP(secret).provisioning_uri(name=email, issuer_name="ATO Sentinel")
+    qr_code_data_uri = ""
+    try:
+        import qrcode
+        import qrcode.image.svg
+
+        image = qrcode.make(provisioning_uri, image_factory=qrcode.image.svg.SvgPathImage)
+        buffer = io.BytesIO()
+        image.save(buffer)
+        qr_code_data_uri = "data:image/svg+xml;base64," + base64.b64encode(buffer.getvalue()).decode("ascii")
+    except ImportError:
+        qr_code_data_uri = ""
+    return {
+        "secret": secret,
+        "provisioning_uri": provisioning_uri,
+        "qr_code_data_uri": qr_code_data_uri,
+    }
 
 
 def _set_session_cookie(request: Request, response, sid: str) -> None:
@@ -288,7 +310,7 @@ def mfa_enroll_form(
             "auth/mfa_enroll.html",
             pending_login=bool(payload.get("complete_login")),
             ticket=ticket,
-            secret=payload["secret"],
+            **_build_mfa_enrollment_context(payload["email"], payload["secret"]),
         )
 
     if not auth_context:
@@ -315,7 +337,7 @@ def mfa_enroll_form(
         "auth/mfa_enroll.html",
         pending_login=False,
         ticket=ticket,
-        secret=secret,
+        **_build_mfa_enrollment_context(auth_context.user.email, secret),
     )
 
 
@@ -347,7 +369,7 @@ def mfa_enroll_post(
             "auth/mfa_enroll.html",
             pending_login=bool(payload.get("complete_login")),
             ticket=ticket,
-            secret=payload["secret"],
+            **_build_mfa_enrollment_context(payload["email"], payload["secret"]),
             error="The TOTP verification code was invalid.",
         )
 
