@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from scripts.simulate.common import BASE_URL, new_session, post_form
+from scripts.simulate.common import BASE_URL, new_session, post_form, run_script
 
 
 def main() -> None:
@@ -20,4 +20,4 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    run_script(main, label="Password spray simulation")

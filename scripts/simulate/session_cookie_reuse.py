@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import time
 
-from scripts.simulate.common import BASE_URL, new_session, post_form
+from scripts.simulate.common import new_session, get, post_form, run_script
 
 
 def main() -> None:
@@ -28,9 +28,9 @@ def main() -> None:
         device_entropy="attacker-handset",
     )
     attacker.cookies.set("ato_sid", sid)
-    security_page = attacker.get(f"{BASE_URL}/account/security", allow_redirects=False)
+    security_page = get(attacker, "/account/security", allow_redirects=False)
     print(f"Session reuse status={security_page.status_code} location={security_page.headers.get('location')}")
 
 
 if __name__ == "__main__":
-    main()
+    run_script(main, label="Session cookie reuse simulation")
