@@ -31,7 +31,7 @@ services:
       [
         "sh",
         "-lc",
-        "uv run alembic upgrade head && uv run uvicorn app:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/ato_sentinel --reload-dir /app/templates --reload-dir /app/static",
+        "uv sync --frozen --no-dev && uv run alembic upgrade head && uv run uvicorn app:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/ato_sentinel --reload-dir /app/templates --reload-dir /app/static",
       ]
     ports:
       - "8000:8000"
@@ -40,8 +40,10 @@ services:
       - ./ato_sentinel:/app/ato_sentinel
       - ./alembic:/app/alembic
       - ./alembic.ini:/app/alembic.ini
+      - ./pyproject.toml:/app/pyproject.toml
       - ./templates:/app/templates
       - ./static:/app/static
+      - ./uv.lock:/app/uv.lock
 
 volumes:
   pgdata:
